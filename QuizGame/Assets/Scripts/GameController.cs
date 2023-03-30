@@ -53,8 +53,11 @@ public class GameController : MonoBehaviour
     public Transform answerButtonPerent;
     public GameObject answerButtonPref;
     public typeColorButton answerButtonColor;
+    public Sprite[] endHeroSprite = new Sprite[2];
     public List<GameObject> answerPanel = new List<GameObject>();
     public List<GameObject> paintZone = new List<GameObject>();
+
+    public GameObject endButton;
 
     private int IndexQuestion;
     public int indexQuestion
@@ -63,17 +66,34 @@ public class GameController : MonoBehaviour
         set
         {
             IndexQuestion = value;
-            if(selectHeroObj.numberHero == 2 && IndexQuestion < allQuestions.Count || selectHeroObj.numberHero == 1 && IndexQuestion < 5)
-            {
-                for (int i = 0; i < answerPanel.Count; i++) answerPanel[i].SetActive((i == 0) ? true : false);
-                CreateAnswerButton();
-            }
-            else
-            {
-                for (int i = 0; i < answerPanel.Count; i++) answerPanel[i].SetActive((i == 3) ? true : false);
-            }
+            ChangePanel();
         }
     }
+
+    private async Task ChangePanel()
+    {
+        if (selectHeroObj.numberHero == 2 && IndexQuestion < allQuestions.Count || selectHeroObj.numberHero == 1 && IndexQuestion < 5)
+        {
+            for (int i = 0; i < answerPanel.Count; i++) answerPanel[i].SetActive((i == 0) ? true : false);
+            CreateAnswerButton();
+        }
+        else
+        {
+            for (int i = 0; i < answerPanel.Count; i++) answerPanel[i].SetActive((i == 3) ? true : false);
+            heroPref[0].GetComponent<Image>().sprite = endHeroSprite[0];
+            heroPref[1].GetComponent<Image>().sprite = endHeroSprite[1];
+            for (float t = 0; t < 1; t+=Time.deltaTime)
+            {
+                heroPref[0].GetComponent<Image>().color = new Color(1, 1, 1, Mathf.Lerp(0, 1, t / 1));
+                heroPref[1].GetComponent<Image>().color = new Color(1, 1, 1, Mathf.Lerp(0, 1, t / 1));
+                await Task.Delay(1);
+            }
+            await Task.Delay(500);
+            endButton.SetActive(true);
+        }
+    }
+
+
     private List<GameObject> allAnswerButton = new List<GameObject>();
 
     public void OnPointerClick(SelectHero hero)
@@ -163,10 +183,10 @@ public class GameController : MonoBehaviour
             obj.GetComponent<Answer>().thisAnswerIndex = i;// allQuestions[indexQuastion].
             obj.GetComponent<RectTransform>().localPosition = 
                 new Vector2((allQuestions[indexQuestion].countVariableAnswer > 3)?
-                    175 + (i % 2) * -350 : 
-                        (i > 2)? 0:
-                        175 + (i % 2) * -350
-                , (i < 3) ? -80 : -160);
+                    90 + (i % 2) * -380 : 
+                        (i > 2)? -100:
+                        90 + (i % 2) * -380
+                , (i < 3) ? -100 : -190);
             obj.GetComponentInChildren<TextMeshProUGUI>().text = $"ÂÀÐÈÀÍÒ {i}";
             allAnswerButton.Add(obj);
         }
@@ -183,34 +203,38 @@ public class GameController : MonoBehaviour
     public void SendAnswer() => SendAnswerTask();
     private async Task SendAnswerTask()
     {
-        foreach (var button in allAnswerButton)
+        if (allQuestions[indexQuestion].selectAnswer != 0)
         {
-            button.GetComponent<Button>().interactable = false;
-            button.GetComponent<Image>().color = (allQuestions[indexQuestion].answer == button.GetComponent<Answer>().thisAnswerIndex) ?
-                answerButtonColor.CorrectButton :
-                answerButtonColor.IncorrectButton;
+            allAnswerButton[allQuestions[indexQuestion].selectAnswer - 1].GetComponent<Image>().color = 
+                (allQuestions[indexQuestion].answer == allAnswerButton[allQuestions[indexQuestion].selectAnswer - 1].GetComponent<Answer>().thisAnswerIndex) ?
+                    answerButtonColor.CorrectButton :
+                    answerButtonColor.IncorrectButton;
+            foreach (var button in allAnswerButton)
+            {
+                button.GetComponent<Button>().interactable = false;
+            }
+
+            allAnswerButton[allQuestions[indexQuestion].selectAnswer - 1].GetComponent<Animator>().SetBool("Change", true);
+            await Task.Delay(2000);
+            allAnswerButton[allQuestions[indexQuestion].selectAnswer - 1].GetComponent<Animator>().SetBool("Change", false);
+
+
+            for (int i = 0; i < answerPanel.Count; i++) answerPanel[i].SetActive((i == (CheckOnCorrectAnswer() ? 1 : 2)) ? true : false);
+            if (CheckOnCorrectAnswer())
+            {
+                var removPaintZon = paintZone[Random.Range(0, paintZone.Count)];
+                removPaintZon.GetComponent<Animator>().SetBool("destroy", true);
+            }
+
+
+            foreach (var button in allAnswerButton)
+                Destroy(button);
+            allAnswerButton.Clear();
         }
-
-
-        allAnswerButton[allQuestions[indexQuestion].selectAnswer-1].GetComponent<Animator>().SetBool("Change",true);
-        await Task.Delay(2000);
-        allAnswerButton[allQuestions[indexQuestion].selectAnswer - 1].GetComponent<Animator>().SetBool("Change", false);
-
-
-        for (int i = 0; i < answerPanel.Count; i++) answerPanel[i].SetActive((i == (CheckOnCorrectAnswer()?1:2))?true:false);
-
-        foreach (var button in allAnswerButton) 
-            Destroy(button);
-        allAnswerButton.Clear();
     }
     private bool CheckOnCorrectAnswer() => allQuestions[indexQuestion].selectAnswer == allQuestions[indexQuestion].answer;
-    public void NextQuestion()
-    {
-        var removPaintZon = paintZone[Random.Range(0, paintZone.Count)];
-        removPaintZon.GetComponent<Animator>().SetBool("destroy",true);
+    public void NextQuestion() => indexQuestion++;
 
-        indexQuestion++;
-    }
 
     public void BackQuestion() => indexQuestion = indexQuestion;
 
